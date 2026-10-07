@@ -21,7 +21,8 @@ homepage; `static/css/style.css` provides responsive styling.
   and role helpers. Agree on helper signatures with Person 3 before CRUD work.
 - Person 5: activities/admin blueprints, QA coordination, README coordination.
 
-These module paths are proposed interfaces, not existing implementations.
+The trip blueprint and database adapter now exist; authentication, dashboard,
+and activities/admin remain teammate integrations.
 Keep route modules independent of a global Flask app; use blueprints and
 `current_app` so tests and clean setups can create separate app instances.
 
@@ -32,3 +33,10 @@ implements it; Person 2 should coordinate polish rather than duplicate it.
 MongoDB hosting, configuration names, auth helper signatures, admin provisioning,
 and activities release scope remain open. Use one origin for pages and API by
 default to avoid unnecessary CORS and cross-origin session configuration.
+
+## Person Three implementation
+
+The factory registers routes/trips.py. database.py supplies init_db/get_db and
+reads configured MongoDB settings. The verified-login handoff is a signed
+session user_id, checked against users on every request; see
+[Person Three notes](person-3-api-notes.md) for configuration and CSRF usage.
