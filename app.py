@@ -15,6 +15,7 @@ def create_app(test_config=None):
     if test_config is not None:
         app.config.update(test_config)
 
+<<<<<<< HEAD
     destinations = [
         ("Venice", "venice", 199, "Wander along canals and discover the charm of Italy."),
         ("San Pedro", "beach", 249, "Slow down by palm-lined beaches and turquoise water."),
@@ -48,5 +49,11 @@ def create_app(test_config=None):
     @app.get("/")
     def index():
         return render_template("index.html", destinations=home_destinations)
+=======
+    # Register teammates' blueprints here once their implementations are merged.
+    @app.get("/")
+    def index():
+        return render_template("index.html")
+>>>>>>> 4db3e3d4e5db14614876400eaac9cec4b773d116
 
     return app

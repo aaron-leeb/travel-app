@@ -1,3 +1,29 @@
 <!doctype html>
+<<<<<<< HEAD
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Discover beautiful destinations and plan your next adventure with TravelMate."><title>{{ title|default('Your Dream Vacation') }} | TravelMate</title><link rel="stylesheet" href="{{ url_for('static',filename='css/style.css') }}"><script src="{{ url_for('static',filename='js/app.js') }}" defer></script></head>
 <body><a class="skip" href="#main">Skip to content</a><header class="header"><div class="topline"><a class="brand" href="/">✧ TravelMate</a><div><a href="tel:+1331445023">☎ +1 331 445 023</a><a href="mailto:hello@travelmate.example">✉ hello@travelmate.example</a></div></div><nav aria-label="Main navigation"><button class="menu-toggle" aria-expanded="false" aria-controls="nav-links">Menu ☰</button><div id="nav-links">{% for label,path in [('Home','/'),('Packages','/packages'),('Tours','/tours'),('About Us','/about'),('Contact','/contact')] %}<a href="{{ path }}" {% if request.path == path %}aria-current="page"{% endif %}>{{ label }}</a>{% endfor %}</div></nav></header><main id="main">{% block content %}{% endblock %}</main><footer><a class="footer-brand" href="/">✧ TravelMate</a><p>Explore the world with us.</p><nav aria-label="Footer navigation"><a href="/packages">Packages</a><a href="/about">About Us</a><a href="/contact">Contact</a></nav><small>© 2026 TravelMate. Your next adventure starts here.</small></footer><dialog id="details"><button class="close" aria-label="Close details">×</button><div id="detail-content"></div></dialog></body></html>
+=======
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="TravelMate brings your trip plans, destinations, and activities together.">
+  <title>{% block title %}TravelMate · Make room for adventure{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <nav class="container navigation" aria-label="Main navigation">
+      <a class="brand" href="{{ url_for('index') }}" aria-label="TravelMate home">Travel<span>Mate</span></a>
+      <div class="nav-links">
+        <a href="{{ url_for('index') }}#features">Explore features</a>
+        <a href="{{ url_for('index') }}#how-it-works">How it works</a>
+      </div>
+    </nav>
+  </header>
+  <main id="main">{% block content %}{% endblock %}</main>
+  <footer class="site-footer"><div class="container">TravelMate <span>Thoughtful plans. Memorable journeys.</span></div></footer>
+</body>
+</html>
+>>>>>>> 4db3e3d4e5db14614876400eaac9cec4b773d116

@@ -1,6 +1,43 @@
+<<<<<<< HEAD
 {% extends "base.html" %}{% block content %}
 <section class="hero sahara-hero"><div class="hero-slides" aria-hidden="true"></div><div class="desert-scene" aria-hidden="true"><div class="dune dune-far"></div><div class="dune dune-front"></div></div><div class="hero-copy"><h1>SAHARA</h1><p class="script">The Largest Hot Desert</p></div><div class="hero-controls" role="group" aria-label="Hero slideshow"><button id="hero-prev" type="button" aria-label="Previous slide">‹</button><div id="hero-dots"></div><button id="hero-next" type="button" aria-label="Next slide">›</button><button id="hero-pause" type="button">Pause</button></div><div class="search-wrap"><div class="tabs" role="group" aria-label="Search category"><button class="active" data-category="Flights" aria-pressed="true">Flights</button><button data-category="Hotels" aria-pressed="false">Hotels</button><button data-category="Tours" aria-pressed="false">Tours</button></div><form id="search-form" class="search"><label><span id="origin-label">From</span><input id="origin" placeholder="Departure city" required></label><label><span>To</span><input id="destination" placeholder="Destination" required></label><label><span>Departure date</span><input type="date" id="departure" required></label><label><span>Return date</span><input type="date" id="return"></label><label><span>Travelers</span><select id="travelers"><option>1 traveler</option><option>2 travelers</option><option>3 travelers</option><option>4+ travelers</option></select></label><button class="primary" type="submit" aria-label="Search travel options">Search →</button></form></div></section>
 <section class="water section" id="destinations"><div class="container"><h2 class="script">Popular Destinations</h2><p class="intro">Where will your next adventure take you?</p><div class="climate-picker" role="group" aria-label="Destination climate"><button class="active" data-climate="warm" aria-pressed="true">☀ Somewhere warm</button><button data-climate="cold" aria-pressed="false">❄ Somewhere cold</button></div><p id="climate-description" class="intro" role="status">Sunshine, golden dunes, and island escapes.</p><p id="search-message" role="status"></p><div class="carousel"><button class="arrow previous" aria-label="Previous destinations">‹</button><div class="cards" id="destination-cards">{% include '_cards.html' %}</div><button class="arrow next" aria-label="Next destinations">›</button></div></div></section>
 <section class="scenic"><h2>Find your own little paradise.</h2><a class="primary" href="/packages">Explore our packages</a></section>
 <section class="water section"><div class="container"><h2 class="script">Why Travel With Us?</h2><div class="benefits"><article><span>◇</span><h3>Thoughtfully planned</h3><p>Discover inspiring destinations and experiences tailored to your kind of adventure.</p></article><article><span>♡</span><h3>Travel your way</h3><p>From quiet beach escapes to lively city breaks, find a journey that feels like you.</p></article><article><span>☼</span><h3>Memories that last</h3><p>Make time for new places, new connections, and the moments that matter.</p></article></div><h2 class="script">Your Next Adventure</h2><div class="gallery"><img src="/static/images/venice.jpg" alt="Venice canal and bridge"><img src="/static/images/marina.jpg" alt="Turquoise marina"><img src="/static/images/cove.jpg" alt="Secluded coastal cove"></div></div></section>
 <section class="newsletter"><h2 class="script">A little inspiration for your inbox</h2><p>Dream destinations and travel ideas, delivered to you.</p><form id="newsletter"><label class="sr-only" for="email">Email address</label><input id="email" type="email" placeholder="Your email address" required><button class="primary">Subscribe</button></form><p id="newsletter-message" role="status"></p></section>{% endblock %}
+=======
+{% extends "base.html" %}
+{% block content %}
+<section class="hero container" aria-labelledby="hero-title">
+  <div>
+    <p class="eyebrow">A little planning. A world of possibility.</p>
+    <h1 id="hero-title">Your next adventure<br><span>starts with a plan.</span></h1>
+    <p class="intro">Bring your destinations, dates, and ideas together in one place. TravelMate is being built to help you spend less time organizing and more time looking forward to the journey.</p>
+    <a class="button" href="#features">Explore TravelMate <span aria-hidden="true">↗</span></a>
+  </div>
+  <aside class="trip-preview" aria-labelledby="preview-title">
+    <p class="eyebrow">A glimpse of your next getaway</p>
+    <div class="landscape" aria-hidden="true"><span>✦</span></div>
+    <p class="preview-label">Example trip</p>
+    <h2 id="preview-title">Chicago weekend</h2>
+    <p>City walks, good food, and a fresh perspective.</p>
+    <dl class="trip-facts"><div><dt>Destination</dt><dd>Chicago, IL</dd></div><div><dt>Duration</dt><dd>4 days</dd></div></dl>
+  </aside>
+</section>
+<section id="features" class="feature-section" aria-labelledby="features-title">
+  <div class="container">
+    <p class="eyebrow">Designed around your journey</p>
+    <h2 id="features-title">Everything starts with a clear plan.</h2>
+    <div class="card-grid">
+      <article class="feature-card"><span class="number">01</span><h3>Your trips, together</h3><p>Keep destinations, travel dates, budgets, and notes organized for each getaway.</p></article>
+      <article class="feature-card"><span class="number">02</span><h3>Room for every idea</h3><p>Plan the places and activities that make each trip your own.</p></article>
+      <article class="feature-card"><span class="number">03</span><h3>Plans that stay with you</h3><p>The planned account experience will let you return to your saved trips across sessions.</p></article>
+    </div>
+  </div>
+</section>
+<section id="how-it-works" class="container how-section" aria-labelledby="how-title">
+  <div><p class="eyebrow">From inspiration to itinerary</p><h2 id="how-title">A simpler way to get going.</h2><p>Account access and trip management are coming soon.</p></div>
+  <ol class="steps"><li><strong>Create your account</strong><span>Have a personal place for your travel plans.</span></li><li><strong>Shape your trip</strong><span>Choose a destination, dates, and budget.</span></li><li><strong>Make it yours</strong><span>Add ideas and update your plans as they grow.</span></li></ol>
+</section>
+{% endblock %}
+>>>>>>> 4db3e3d4e5db14614876400eaac9cec4b773d116
