@@ -36,6 +36,7 @@ Unchecked items are not validated or implemented merely by being listed.
 - [ ] Final ZIP excludes `.venv`, `.git`, credentials, and generated clutter.
 - [ ] Extract ZIP and rerun setup/demo; verify source and slides are included.
 
-Current blockers: no MongoDB/authentication, trip API/dashboard, admin, or
-activities implementation exists. Final merges/release cannot be claimed until
+Current blockers: authentication, dashboard, admin, and activities implementations
+are pending. Person Three trip APIs and the database adapter are implemented;
+eight tests passed, including real local MongoDB CRUD/persistence. Final merges/release cannot be claimed until
 those owner contributions are available. Instructor deadline remains unverified.

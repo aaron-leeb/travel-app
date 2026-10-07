@@ -1,6 +1,7 @@
-# Proposed trip API contract — team confirmation required
+# Trip API contract
 
-This is a design proposal for Persons 2, 3, and 4, not an implemented API.
+The trip blueprint implements this contract. Local MongoDB CRUD/persistence verification passed. Authentication
+and frontend integration are still pending.
 Person 3 owns implementation. Person 4 supplies authenticated identity.
 
 | Method | Path | Success |
@@ -25,7 +26,7 @@ Create and PUT requests use `Content-Type: application/json` and fields:
 }
 ```
 
-Proposed rules: title/destination are trimmed nonempty strings; dates are valid
+Implemented rules: title/destination are trimmed nonempty strings; dates are valid
 YYYY-MM-DD with end >= start; budget is a finite nonnegative number (not boolean);
 description is optional; status defaults to Planned and allows Planned,
 Ongoing, Completed. PUT supplies the full editable record. IDs are JSON strings
@@ -37,6 +38,20 @@ Use 400 for malformed JSON, invalid IDs, or validation; 401 without a session;
 for a non-JSON write request; 500 for unexpected failures without internal
 details. Check session identity before querying owned resources.
 
+## Authorization and administration
+
+The implemented trip endpoints are available to authenticated sessions only,
+and each operation is restricted to trips whose `user_id` matches the session
+user. No admin-only API endpoints are implemented currently. An admin role in
+the seeded `users` collection does not grant broader trip access by itself;
+authorization must be explicitly added server-side.
+
+Potential admin-only features include managing or deactivating user accounts,
+viewing system-wide users/trips, and administering activities. These should use
+separate admin routes protected by a server-side role check (for example,
+`session["role"] == "admin"` after verifying the session identity against the
+database). Do not widen the existing user trip routes to bypass owner checks.
+
 ## Security/integration decisions
 
 - All five routes require authentication and server-side ownership checks.
@@ -47,3 +62,12 @@ details. Check session identity before querying owned resources.
 - Never return password hashes in user/admin JSON responses.
 - Person 4 must define session identity, expiry behavior, database access, and
   helpers before Person 3 finalizes the implementation.
+
+## Implemented integration interface
+
+See [Person Three notes](person-3-api-notes.md). Authenticated writes require
+X-CSRF-Token from GET /api/csrf-token; missing/invalid tokens return 403.
+Database configuration/availability errors return 503. Person Four must set
+session["user_id"] after verified login and clear it on logout.
+The user account is rechecked in MongoDB before each trip request.
+DELETE currently removes only the trip; activity cleanup remains a team decision.

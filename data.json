@@ -1,0 +1,41 @@
+{
+  "users": [
+    {
+      "_id": {
+        "$oid": "64b000000000000000000001"
+      },
+      "email": "user@example.com",
+      "name": "Test User",
+      "password_hash": "scrypt:32768:8:1$YvbbssTEexYAnkiZ$038b7482a0030b0e6f7dd982530b4a12dbd9fe7c3633309863d2dba52ef9584319b6ea6acd9eb71345cebe0b65f878f9531efe21daa86a782b464258ba412b71",
+      "active": true,
+      "role": "user"
+    },
+    {
+      "_id": {
+        "$oid": "64b000000000000000000002"
+      },
+      "email": "admin@example.com",
+      "name": "Test Admin",
+      "password_hash": "scrypt:32768:8:1$DtKy5PnbV9o5atxF$209b49282c8725f27a96c6169874678d63f14ae24a22b76edceeaa0b9b39ad4da984d8bc3c3b32ccbf5580839d8451f5021d1c7d02755ab0024718d665323286",
+      "active": true,
+      "role": "admin"
+    }
+  ],
+  "trips": [
+    {
+      "_id": {
+        "$oid": "64b000000000000000000003"
+      },
+      "user_id": {
+        "$oid": "64b000000000000000000001"
+      },
+      "title": "Chicago Weekend",
+      "destination": "Chicago, IL",
+      "start_date": "2026-11-10",
+      "end_date": "2026-11-13",
+      "budget": 700,
+      "description": "Weekend trip",
+      "status": "Planned"
+    }
+  ]
+}
