@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="TravelMate brings your trip plans, destinations, and activities together.">
+  <title>{% block title %}TravelMate · Make room for adventure{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <nav class="container navigation" aria-label="Main navigation">
+      <a class="brand" href="{{ url_for('index') }}" aria-label="TravelMate home">Travel<span>Mate</span></a>
+      <div class="nav-links">
+        <a href="{{ url_for('index') }}#features">Explore features</a>
+        <a href="{{ url_for('index') }}#how-it-works">How it works</a>
+      </div>
+    </nav>
+  </header>
+  <main id="main">{% block content %}{% endblock %}</main>
+  <footer class="site-footer"><div class="container">TravelMate <span>Thoughtful plans. Memorable journeys.</span></div></footer>
+</body>
+</html>

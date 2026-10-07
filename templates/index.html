@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero container" aria-labelledby="hero-title">
+  <div>
+    <p class="eyebrow">A little planning. A world of possibility.</p>
+    <h1 id="hero-title">Your next adventure<br><span>starts with a plan.</span></h1>
+    <p class="intro">Bring your destinations, dates, and ideas together in one place. TravelMate is being built to help you spend less time organizing and more time looking forward to the journey.</p>
+    <a class="button" href="#features">Explore TravelMate <span aria-hidden="true">↗</span></a>
+  </div>
+  <aside class="trip-preview" aria-labelledby="preview-title">
+    <p class="eyebrow">A glimpse of your next getaway</p>
+    <div class="landscape" aria-hidden="true"><span>✦</span></div>
+    <p class="preview-label">Example trip</p>
+    <h2 id="preview-title">Chicago weekend</h2>
+    <p>City walks, good food, and a fresh perspective.</p>
+    <dl class="trip-facts"><div><dt>Destination</dt><dd>Chicago, IL</dd></div><div><dt>Duration</dt><dd>4 days</dd></div></dl>
+  </aside>
+</section>
+<section id="features" class="feature-section" aria-labelledby="features-title">
+  <div class="container">
+    <p class="eyebrow">Designed around your journey</p>
+    <h2 id="features-title">Everything starts with a clear plan.</h2>
+    <div class="card-grid">
+      <article class="feature-card"><span class="number">01</span><h3>Your trips, together</h3><p>Keep destinations, travel dates, budgets, and notes organized for each getaway.</p></article>
+      <article class="feature-card"><span class="number">02</span><h3>Room for every idea</h3><p>Plan the places and activities that make each trip your own.</p></article>
+      <article class="feature-card"><span class="number">03</span><h3>Plans that stay with you</h3><p>The planned account experience will let you return to your saved trips across sessions.</p></article>
+    </div>
+  </div>
+</section>
+<section id="how-it-works" class="container how-section" aria-labelledby="how-title">
+  <div><p class="eyebrow">From inspiration to itinerary</p><h2 id="how-title">A simpler way to get going.</h2><p>Account access and trip management are coming soon.</p></div>
+  <ol class="steps"><li><strong>Create your account</strong><span>Have a personal place for your travel plans.</span></li><li><strong>Shape your trip</strong><span>Choose a destination, dates, and budget.</span></li><li><strong>Make it yours</strong><span>Add ideas and update your plans as they grow.</span></li></ol>
+</section>
+{% endblock %}
