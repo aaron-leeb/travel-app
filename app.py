@@ -2,6 +2,7 @@
 
 import os
 
+from dotenv import load_dotenv
 from flask import Flask, render_template
 
 from database import init_db
@@ -9,6 +10,7 @@ from routes.trips import bp as trips_bp
 
 
 def create_app(test_config=None):
+    load_dotenv()
     app = Flask(__name__)
     app.config.from_mapping(
         SECRET_KEY=os.environ.get("TRAVELMATE_SECRET_KEY"),
