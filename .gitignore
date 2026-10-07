@@ -1,8 +1,12 @@
-# Dependencies
-node_modules/
-
-# Virtual Environments
 .venv/
-
-# Ignore environment variables / secrets
+__pycache__/
+*.py[cod]
 .env
+.env.*
+!.env.example
+.pytest_cache/
+instance/
+dist/
+
+# Frontend dependencies
+node_modules/
