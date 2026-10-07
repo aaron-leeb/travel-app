@@ -27,8 +27,9 @@ will have protected access to system-wide information.
 ## Current implementation
 
 The Flask application factory, responsive public homepage, and navigation are
-implemented. Authentication, MongoDB, dashboard, trip CRUD, and admin/activity
-features are not implemented yet. The homepage example is illustrative data.
+implemented. Trip CRUD APIs, a MongoDB adapter, validation, ownership checks, and CSRF
+protection are implemented. Authentication, dashboard, and admin/activity
+features still require teammate integration. The homepage example is illustrative data.
 
 ## Local setup
 
@@ -46,8 +47,8 @@ the current public homepage. Stop the development server with Ctrl+C.
 
 Before authentication is integrated, set `TRAVELMATE_SECRET_KEY` to a securely
 generated private value in your local environment. The factory reads it without
-a hardcoded fallback; never commit it. MongoDB configuration will be documented
-when Person 4 supplies the connection implementation. Flask's development
+a hardcoded fallback; never commit it. Set MONGODB_URI and MONGODB_DATABASE for trip persistence. The database adapter
+is available for Person 4 to reuse with authentication. Flask's development
 server is for development only.
 
 ## Team references
@@ -57,3 +58,25 @@ server is for development only.
 - [Git and integration workflow](docs/workflow.md)
 - [Integration/release checklist](docs/integration-checklist.md)
 - [Person 1 presentation notes](docs/presentation-notes.md)
+
+## Person Three API setup on Windows
+
+From the cloned travel-app folder:
+
+```powershell
+py -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+$env:MONGODB_URI = "mongodb://127.0.0.1:27017"
+$env:MONGODB_DATABASE = "travelmate"
+$env:TRAVELMATE_SECRET_KEY = (.\.venv\Scripts\python.exe -c "import secrets; print(secrets.token_hex(32))")
+.\.venv\Scripts\python.exe -m flask --app app:create_app run
+```
+
+Use your team's MongoDB URI instead of localhost if using Atlas. Keep it private.
+example.env is a reference; .env files are not loaded automatically. Public
+homepage works without MongoDB. Protected APIs require Person Four's login
+implementation; no login endpoint exists yet.
+
+Run isolated API tests: `.\.venv\Scripts\python.exe -m unittest discover -s tests -v`.
+See [Person Three implementation and handoff notes](docs/person-3-api-notes.md)
+for JSON, CSRF, authentication integration, and presentation practice.
