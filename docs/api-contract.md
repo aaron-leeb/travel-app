@@ -38,6 +38,20 @@ Use 400 for malformed JSON, invalid IDs, or validation; 401 without a session;
 for a non-JSON write request; 500 for unexpected failures without internal
 details. Check session identity before querying owned resources.
 
+## Authorization and administration
+
+The implemented trip endpoints are available to authenticated sessions only,
+and each operation is restricted to trips whose `user_id` matches the session
+user. No admin-only API endpoints are implemented currently. An admin role in
+the seeded `users` collection does not grant broader trip access by itself;
+authorization must be explicitly added server-side.
+
+Potential admin-only features include managing or deactivating user accounts,
+viewing system-wide users/trips, and administering activities. These should use
+separate admin routes protected by a server-side role check (for example,
+`session["role"] == "admin"` after verifying the session identity against the
+database). Do not widen the existing user trip routes to bypass owner checks.
+
 ## Security/integration decisions
 
 - All five routes require authentication and server-side ownership checks.

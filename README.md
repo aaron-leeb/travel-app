@@ -48,15 +48,24 @@ the current public homepage. Stop the development server with Ctrl+C.
 Copy `example.env` to `.env` and set its values for local development. The app
 loads `.env` when creating the Flask app; do not commit secrets. Set
 `TRAVELMATE_SECRET_KEY` to a securely generated private value and configure
-`MONGODB_URI` and `MONGODB_DATABASE` for trip persistence. The database adapter
-is available for Person 4 to reuse with authentication. Flask's development
-server is for development only.
+`MONGODB_URI` and `MONGODB_DATABASE` for trip persistence. Local MongoDB can use
+`mongodb://localhost:27017/`; use your private Atlas URI when running against
+Atlas. The default database name is `travelmate`.
+
+The database uses a `users` collection for user and admin accounts (separated
+by the `role` value) and a `trips` collection. Trips store an ObjectId
+`user_id` referencing the owning user. The API sets ownership from the session
+and filters trip operations by that owner. MongoDB is not needed for the public
+homepage, but it must be running and configured for database-backed operations.
+Flask's development server is for development only.
 
 To add the sample user accounts and trip from `data.json` to the configured
 database, run `.\.venv\Scripts\python.exe seed_users.py` from the repository
 root. The script inserts only users that do not already exist by email and
 trips that do not already exist by `_id`; it does not overwrite existing
 records. Trip ownership is resolved to the user's actual database `_id`.
+The sample credentials in `data.json` are for local testing only. The seed
+script does not create a login endpoint.
 
 ## Team references
 

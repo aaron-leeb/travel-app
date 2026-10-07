@@ -26,17 +26,29 @@ and activities/admin remain teammate integrations.
 Keep route modules independent of a global Flask app; use blueprints and
 `current_app` so tests and clean setups can create separate app instances.
 
-## Decisions needing team confirmation
-
-Person 2's Monday homepage task overlaps Person 1 ownership: this foundation
-implements it; Person 2 should coordinate polish rather than duplicate it.
-MongoDB hosting, configuration names, auth helper signatures, admin provisioning,
-and activities release scope remain open. Use one origin for pages and API by
-default to avoid unnecessary CORS and cross-origin session configuration.
-
 ## Person Three implementation
 
 The factory registers routes/trips.py. database.py supplies init_db/get_db and
 reads configured MongoDB settings. The verified-login handoff is a signed
 session user_id, checked against users on every request; see
 [Person Three notes](person-3-api-notes.md) for configuration and CSRF usage.
+
+## MongoDB data and local setup
+
+The app reads `MONGODB_URI` and `MONGODB_DATABASE` from the process environment;
+`app.py` loads `.env` at app creation. Local MongoDB may use
+`mongodb://localhost:27017/`; the default database name is `travelmate`. Keep
+Atlas credentials in an untracked `.env` or deployment environment.
+
+`database.py` installs the configured database into `app.extensions["mongo_db"]`
+and exposes it through `get_db()`. The trip API and future auth routes share
+this accessor. The database contains `users` and `trips` collections. User
+documents include `name`, `email`, `password_hash`, `active`, and `role`;
+trips include a MongoDB ObjectId `user_id`. Trip ownership is assigned from
+the authenticated session and enforced in every trip query.
+
+`seed_users.py` reads the `users` and `trips` arrays from root `data.json`,
+inserts missing users by email and missing trips by `_id`, and resolves trip
+owners to the actual database user ObjectId. It is safe to rerun without
+overwriting existing records. The sample credentials are for local testing
+only; no login API is implemented yet.
