@@ -21,16 +21,55 @@
       "role": "admin"
     }
   ],
-  "trips": [
+  "destinations": [
     {
       "_id": {
         "$oid": "64b000000000000000000003"
       },
+      "name": "Chicago, IL",
+      "price": 199
+    },
+    {
+      "_id": {
+        "$oid": "64b000000000000000000004"
+      },
+      "name": "Venice",
+      "price": 199
+    },
+    {
+      "_id": {
+        "$oid": "64b000000000000000000005"
+      },
+      "name": "San Pedro",
+      "price": 249
+    },
+    {
+      "_id": {
+        "$oid": "64b000000000000000000006"
+      },
+      "name": "Barbados",
+      "price": 299
+    },
+    {
+      "_id": {
+        "$oid": "64b000000000000000000007"
+      },
+      "name": "Cyprus",
+      "price": 239
+    }
+  ],
+  "trips": [
+    {
+      "_id": {
+        "$oid": "64b000000000000000000008"
+      },
       "user_id": {
         "$oid": "64b000000000000000000001"
       },
+      "destination_id": {
+        "$oid": "64b000000000000000000003"
+      },
       "title": "Chicago Weekend",
-      "destination": "Chicago, IL",
       "start_date": "2026-11-10",
       "end_date": "2026-11-13",
       "budget": 700,

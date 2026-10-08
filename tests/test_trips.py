@@ -2,56 +2,120 @@
 import copy
 import unittest
 from types import SimpleNamespace
-from unittest.mock import Mock
+
 from bson import ObjectId
 from pymongo.errors import AutoReconnect
+from werkzeug.security import generate_password_hash
+
 from app import create_app
 
 
-class TripsCollection:
+class CursorDouble:
+    def __init__(self, docs):
+        self.docs = docs
+
+    def sort(self, field, direction):
+        reverse = direction == -1
+        return sorted(self.docs, key=lambda doc: doc[field], reverse=reverse)
+
+    def __iter__(self):
+        return iter(self.docs)
+
+
+class CollectionDouble:
     """Small in-memory test double; production always uses PyMongo."""
-    def __init__(self):
+
+    def __init__(self, docs=None):
         self.documents = {}
+        for doc in docs or []:
+            self.documents[doc["_id"]] = copy.deepcopy(doc)
 
     def insert_one(self, doc):
-        doc["_id"] = ObjectId()
-        self.documents[doc["_id"]] = copy.deepcopy(doc)
-        return SimpleNamespace(inserted_id=doc["_id"])
+        stored = copy.deepcopy(doc)
+        stored["_id"] = stored.get("_id", ObjectId())
+        self.documents[stored["_id"]] = stored
+        return SimpleNamespace(inserted_id=stored["_id"])
 
-    def find_one(self, query):
-        return next((copy.deepcopy(d) for d in self.documents.values()
-                     if all(d.get(k) == v for k, v in query.items())), None)
+    def find_one(self, query, projection=None):
+        doc = next(
+            (
+                copy.deepcopy(document)
+                for document in self.documents.values()
+                if all(document.get(key) == value for key, value in query.items())
+            ),
+            None,
+        )
+        if doc is None:
+            return None
+        if projection == {"_id": 1}:
+            return {"_id": doc["_id"]}
+        return doc
 
     def find(self, query):
-        docs = [copy.deepcopy(d) for d in self.documents.values()
-                if all(d.get(k) == v for k, v in query.items())]
-        return SimpleNamespace(sort=lambda *args: sorted(docs, key=lambda d: d["_id"], reverse=True))
+        docs = [
+            copy.deepcopy(document)
+            for document in self.documents.values()
+            if all(document.get(key) == value for key, value in query.items())
+        ]
+        return CursorDouble(docs)
 
     def find_one_and_update(self, query, update, **kwargs):
         doc = self.find_one(query)
-        if doc is not None:
-            self.documents[doc["_id"]].update(update["$set"])
-            return copy.deepcopy(self.documents[doc["_id"]])
-        return None
+        if doc is None:
+            return None
+        self.documents[doc["_id"]].update(copy.deepcopy(update["$set"]))
+        return copy.deepcopy(self.documents[doc["_id"]])
 
     def delete_one(self, query):
         doc = self.find_one(query)
-        if doc:
+        if doc is not None:
             del self.documents[doc["_id"]]
         return SimpleNamespace(deleted_count=int(doc is not None))
 
 
 class TripAPITests(unittest.TestCase):
     def setUp(self):
-        self.owner, self.other = ObjectId(), ObjectId()
-        self.db = SimpleNamespace(trips=TripsCollection(), users=Mock())
-        self.db.users.find_one.side_effect = lambda q, *args: {"_id": q["_id"]} if q["_id"] in {self.owner, self.other} else None
-        self.app = create_app({"TESTING": True, "SECRET_KEY": "test-only-secret",
-                               "MONGO_DB": self.db, "MONGODB_URI": None})
+        self.owner, self.admin = ObjectId(), ObjectId()
+        self.chicago, self.venice = ObjectId(), ObjectId()
+        self.db = SimpleNamespace(
+            trips=CollectionDouble(),
+            destinations=CollectionDouble(
+                [
+                    {"_id": self.chicago, "name": "Chicago, IL", "price": 199},
+                    {"_id": self.venice, "name": "Venice", "price": 249},
+                ]
+            ),
+            users=CollectionDouble(
+                [
+                    {
+                        "_id": self.owner,
+                        "email": "user@example.com",
+                        "name": "Test User",
+                        "password_hash": generate_password_hash("testuser"),
+                        "active": True,
+                        "role": "user",
+                    },
+                    {
+                        "_id": self.admin,
+                        "email": "admin@example.com",
+                        "name": "Test Admin",
+                        "password_hash": generate_password_hash("testadmin"),
+                        "active": True,
+                        "role": "admin",
+                    },
+                ]
+            ),
+        )
+        self.app = create_app({"TESTING": True, "SECRET_KEY": "test-only-secret", "MONGO_DB": self.db, "MONGODB_URI": None})
         self.client = self.app.test_client()
         self.login(self.owner)
-        self.payload = {"title": " Chicago Weekend ", "destination": "Chicago, IL",
-                        "start_date": "2026-11-10", "end_date": "2026-11-13", "budget": 700}
+        self.payload = {
+            "title": " Chicago Weekend ",
+            "destination_id": str(self.chicago),
+            "start_date": "2026-11-10",
+            "end_date": "2026-11-13",
+            "budget": 700,
+        }
 
     def login(self, user):
         with self.client.session_transaction() as session:
@@ -68,20 +132,41 @@ class TripAPITests(unittest.TestCase):
     def test_complete_crud_and_repeat_reads(self):
         self.assertEqual(self.client.get("/api/trips").json, {"trips": []})
         trip_id = self.create()
-        self.assertEqual(self.client.get("/api/trips").json["trips"][0]["title"], "Chicago Weekend")
+        listed_trip = self.client.get("/api/trips").json["trips"][0]
+        self.assertEqual(listed_trip["title"], "Chicago Weekend")
+        self.assertEqual(listed_trip["destination"]["name"], "Chicago, IL")
         trip = self.client.get("/api/trips/" + trip_id).json["trip"]
         self.assertEqual(trip["user_id"], str(self.owner))
         self.assertEqual(trip["status"], "Planned")
+        self.assertEqual(trip["destination_id"], str(self.chicago))
         self.payload["budget"] = 900
+        self.payload["destination_id"] = str(self.venice)
         response = self.client.put("/api/trips/" + trip_id, json=self.payload, headers=self.headers)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(self.client.get("/api/trips/" + trip_id).json["trip"]["budget"], 900)
+        updated_trip = self.client.get("/api/trips/" + trip_id).json["trip"]
+        self.assertEqual(updated_trip["budget"], 900)
+        self.assertEqual(updated_trip["destination"]["name"], "Venice")
         self.assertEqual(self.client.delete("/api/trips/" + trip_id, headers=self.headers).json, {"deleted": True})
         self.assertEqual(self.client.get("/api/trips/" + trip_id).status_code, 404)
 
+    def test_destinations_list_and_admin_create(self):
+        response = self.client.get("/api/destinations")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([destination["name"] for destination in response.json["destinations"]], ["Chicago, IL", "Venice"])
+
+        forbidden = self.client.post("/api/destinations", json={"name": "Cyprus", "price": 239}, headers=self.headers)
+        self.assertEqual(forbidden.status_code, 403)
+
+        self.login(self.admin)
+        created = self.client.post("/api/destinations", json={"name": "Cyprus", "price": 239}, headers=self.headers)
+        self.assertEqual(created.status_code, 201)
+        self.assertEqual(created.json["destination"]["name"], "Cyprus")
+        duplicate = self.client.post("/api/destinations", json={"name": "cyprus", "price": 300}, headers=self.headers)
+        self.assertEqual(duplicate.status_code, 409)
+
     def test_other_user_cannot_read_update_delete(self):
         trip_id = self.create()
-        self.login(self.other)
+        self.login(self.admin)
         self.assertEqual(self.client.get("/api/trips").json, {"trips": []})
         path = "/api/trips/" + trip_id
         self.assertEqual(self.client.get(path).status_code, 404)
@@ -95,25 +180,41 @@ class TripAPITests(unittest.TestCase):
                 session.clear()
                 if identity is not None:
                     session["user_id"] = identity
-            for method, path in [("GET", "/api/trips"), ("GET", "/api/trips/" + str(ObjectId())),
-                                 ("POST", "/api/trips"), ("PUT", "/api/trips/" + str(ObjectId())),
-                                 ("DELETE", "/api/trips/" + str(ObjectId()))]:
+            for method, path in [
+                ("GET", "/api/trips"),
+                ("GET", "/api/trips/" + str(ObjectId())),
+                ("GET", "/api/destinations"),
+                ("POST", "/api/trips"),
+                ("POST", "/api/destinations"),
+                ("PUT", "/api/trips/" + str(ObjectId())),
+                ("DELETE", "/api/trips/" + str(ObjectId())),
+            ]:
                 with self.subTest(identity=identity, method=method):
                     self.assertEqual(self.client.open(path, method=method).status_code, 401)
 
     def test_invalid_payloads(self):
-        cases = [None, [], {}, {**self.payload, "user_id": str(self.other)},
-                 {**self.payload, "title": " "}, {**self.payload, "destination": 3},
-                 {**self.payload, "start_date": "2026-02-30"},
-                 {**self.payload, "end_date": "2026-01-01"},
-                 {**self.payload, "budget": True}, {**self.payload, "budget": -1},
-                 {**self.payload, "budget": float("inf")}, {**self.payload, "budget": 10**400},
-                 {**self.payload, "status": []}, {**self.payload, "description": 123}]
+        cases = [
+            None,
+            [],
+            {},
+            {**self.payload, "user_id": str(self.admin)},
+            {**self.payload, "title": " "},
+            {**self.payload, "destination_id": 3},
+            {**self.payload, "destination_id": str(ObjectId())},
+            {**self.payload, "start_date": "2026-02-30"},
+            {**self.payload, "end_date": "2026-01-01"},
+            {**self.payload, "budget": True},
+            {**self.payload, "budget": -1},
+            {**self.payload, "budget": float("inf")},
+            {**self.payload, "budget": 10**400},
+            {**self.payload, "status": []},
+            {**self.payload, "description": 123},
+        ]
         for payload in cases:
             with self.subTest(payload=payload):
                 import json
-                response = self.client.post("/api/trips", data=json.dumps(payload),
-                                            content_type="application/json", headers=self.headers)
+
+                response = self.client.post("/api/trips", data=json.dumps(payload), content_type="application/json", headers=self.headers)
                 self.assertEqual(response.status_code, 400)
                 self.assertIn("error", response.json)
         self.assertEqual(len(self.db.trips.documents), 0)
@@ -123,14 +224,13 @@ class TripAPITests(unittest.TestCase):
         self.assertEqual(self.client.post("/api/trips", data="hello", headers=self.headers).status_code, 415)
         for method in ["GET", "PUT", "DELETE"]:
             for trip_id, expected in [("bad-id", 400), (str(ObjectId()), 404)]:
-                response = self.client.open("/api/trips/" + trip_id, method=method,
-                                            json=self.payload, headers=self.headers)
+                response = self.client.open("/api/trips/" + trip_id, method=method, json=self.payload, headers=self.headers)
                 self.assertEqual(response.status_code, expected)
 
     def test_csrf_and_failure_redaction(self):
         self.assertEqual(self.client.post("/api/trips", json=self.payload).status_code, 403)
         self.assertEqual(self.client.post("/api/trips", json=self.payload, headers={"X-CSRF-Token": "wrong"}).status_code, 403)
-        self.db.users.find_one.side_effect = AutoReconnect("secret connection string")
+        self.db.users.find_one = lambda *args, **kwargs: (_ for _ in ()).throw(AutoReconnect("secret connection string"))
         response = self.client.get("/api/trips")
         self.assertEqual(response.status_code, 503)
         self.assertNotIn("secret", response.get_data(as_text=True))
@@ -138,6 +238,85 @@ class TripAPITests(unittest.TestCase):
     def test_homepage_without_database(self):
         app = create_app({"TESTING": True, "MONGODB_URI": None})
         self.assertEqual(app.test_client().get("/").status_code, 200)
+
+    def test_homepage_login_accepts_demo_user_and_admin(self):
+        user_response = self.client.post("/", data={"email": "user@example.com", "password": "testuser"})
+        self.assertEqual(user_response.status_code, 302)
+        self.assertTrue(user_response.headers["Location"].endswith("/dashboard"))
+        with self.client.session_transaction() as session:
+            self.assertEqual(session["user_id"], str(self.owner))
+            self.assertEqual(session["user_role"], "user")
+
+        admin_response = self.client.post("/", data={"email": "admin@example.com", "password": "testadmin"})
+        self.assertEqual(admin_response.status_code, 302)
+        self.assertTrue(admin_response.headers["Location"].endswith("/"))
+        with self.client.session_transaction() as session:
+            self.assertEqual(session["user_id"], str(self.admin))
+            self.assertEqual(session["user_role"], "admin")
+
+    def test_dashboard_shows_destinations_and_adds_trip(self):
+        response = self.client.get("/dashboard")
+        self.assertEqual(response.status_code, 200)
+        page = response.get_data(as_text=True)
+        self.assertIn("Welcome, Test User", page)
+        self.assertIn("Chicago, IL ($199)", page)
+
+        created = self.client.post(
+            "/dashboard/trips",
+            data={
+                "csrf_token": self.headers["X-CSRF-Token"],
+                "title": "Holiday Break",
+                "destination_id": str(self.chicago),
+                "start_date": "2026-12-20",
+                "end_date": "2026-12-24",
+                "budget": "800",
+                "status": "Planned",
+                "description": "Family trip",
+            },
+        )
+        self.assertEqual(created.status_code, 302)
+        self.assertTrue(created.headers["Location"].endswith("/dashboard"))
+        dashboard = self.client.get("/dashboard").get_data(as_text=True)
+        self.assertIn("Holiday Break", dashboard)
+        self.assertIn("Chicago, IL", dashboard)
+
+    def test_dashboard_edits_and_deletes_trip_without_changing_destination(self):
+        trip_id = self.create()
+        created_trip = self.db.trips.find_one({"_id": ObjectId(trip_id)})
+        response = self.client.post(
+            f"/dashboard/trips/{trip_id}/edit",
+            data={
+                "csrf_token": self.headers["X-CSRF-Token"],
+                "title": "Updated Weekend",
+                "start_date": "2026-11-11",
+                "end_date": "2026-11-14",
+                "budget": "950",
+                "status": "Ongoing",
+                "description": "Updated notes",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        updated_trip = self.db.trips.find_one({"_id": ObjectId(trip_id)})
+        self.assertEqual(updated_trip["title"], "Updated Weekend")
+        self.assertEqual(updated_trip["destination_id"], created_trip["destination_id"])
+        self.assertEqual(updated_trip["budget"], 950)
+        dashboard = self.client.get("/dashboard").get_data(as_text=True)
+        self.assertIn("Updated Weekend", dashboard)
+        self.assertIn("Chicago, IL", dashboard)
+
+        deleted = self.client.post(
+            f"/dashboard/trips/{trip_id}/delete",
+            data={"csrf_token": self.headers["X-CSRF-Token"]},
+        )
+        self.assertEqual(deleted.status_code, 302)
+        self.assertIsNone(self.db.trips.find_one({"_id": ObjectId(trip_id)}))
+
+    def test_dashboard_requires_login(self):
+        with self.client.session_transaction() as session:
+            session.clear()
+        response = self.client.get("/dashboard")
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.headers["Location"].endswith("/"))
 
 
 if __name__ == "__main__":

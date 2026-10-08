@@ -38,10 +38,12 @@ class SeedUsersMongoIntegrationTest(unittest.TestCase):
             self.assertIsNotNone(user)
             self.assertEqual(user["role"], "user")
             self.assertTrue(check_password_hash(user["password_hash"], "testuser"))
+            self.assertEqual(db.destinations.count_documents({}), 5)
 
             trip = db.trips.find_one({"user_id": user["_id"]})
             self.assertIsNotNone(trip)
             self.assertEqual(trip["title"], "Chicago Weekend")
+            self.assertIsNotNone(db.destinations.find_one({"_id": trip["destination_id"], "name": "Chicago, IL"}))
             self.assertIsInstance(trip["_id"], ObjectId)
 
             with patch.dict(
@@ -54,6 +56,7 @@ class SeedUsersMongoIntegrationTest(unittest.TestCase):
                 seed_users.main()
 
             self.assertEqual(db.users.count_documents({}), 2)
+            self.assertEqual(db.destinations.count_documents({}), 5)
             self.assertEqual(db.trips.count_documents({}), 1)
         finally:
             client.drop_database(database_name)
