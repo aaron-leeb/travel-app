@@ -249,10 +249,36 @@ class TripAPITests(unittest.TestCase):
 
         admin_response = self.client.post("/", data={"email": "admin@example.com", "password": "testadmin"})
         self.assertEqual(admin_response.status_code, 302)
-        self.assertTrue(admin_response.headers["Location"].endswith("/"))
+        self.assertTrue(admin_response.headers["Location"].endswith("/admin"))
         with self.client.session_transaction() as session:
             self.assertEqual(session["user_id"], str(self.admin))
             self.assertEqual(session["user_role"], "admin")
+
+    def test_homepage_signup_creates_only_normal_users(self):
+        response = self.client.post(
+            "/",
+            data={"email": "newuser@example.com", "password": "testpass1", "auth_action": "signup"},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.headers["Location"].endswith("/dashboard"))
+
+        created_user = self.db.users.find_one({"email": "newuser@example.com"})
+        self.assertIsNotNone(created_user)
+        self.assertEqual(created_user["role"], "user")
+        self.assertTrue(created_user["active"])
+        self.assertNotEqual(created_user["password_hash"], "testpass1")
+
+        with self.client.session_transaction() as session:
+            self.assertEqual(session["user_id"], str(created_user["_id"]))
+            self.assertEqual(session["user_role"], "user")
+
+    def test_homepage_signup_rejects_duplicate_email(self):
+        response = self.client.post(
+            "/",
+            data={"email": "user@example.com", "password": "testpass1", "auth_action": "signup"},
+        )
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("already exists", response.get_data(as_text=True))
 
     def test_dashboard_shows_destinations_and_adds_trip(self):
         response = self.client.get("/dashboard")
@@ -260,6 +286,11 @@ class TripAPITests(unittest.TestCase):
         page = response.get_data(as_text=True)
         self.assertIn("Welcome, Test User", page)
         self.assertIn("Chicago, IL ($199)", page)
+        self.assertNotIn(">Home<", page)
+        self.assertNotIn(">Dashboard<", page)
+        self.assertNotIn(">Destinations<", page)
+        self.assertNotIn(">Login<", page)
+        self.assertNotIn("Browse destinations", page)
 
         created = self.client.post(
             "/dashboard/trips",
@@ -317,6 +348,62 @@ class TripAPITests(unittest.TestCase):
         response = self.client.get("/dashboard")
         self.assertEqual(response.status_code, 302)
         self.assertTrue(response.headers["Location"].endswith("/"))
+
+    def test_logout_clears_session_from_dashboard(self):
+        page = self.client.get("/dashboard").get_data(as_text=True)
+        self.assertIn("Log out", page)
+        response = self.client.post("/logout", data={"csrf_token": self.headers["X-CSRF-Token"]})
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.headers["Location"].endswith("/"))
+        with self.client.session_transaction() as session:
+            self.assertNotIn("user_id", session)
+        redirect = self.client.get("/dashboard")
+        self.assertEqual(redirect.status_code, 302)
+        self.assertTrue(redirect.headers["Location"].endswith("/"))
+
+    def test_admin_page_requires_admin_and_manages_destinations(self):
+        response = self.client.get("/admin")
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.headers["Location"].endswith("/dashboard"))
+
+        self.login(self.admin)
+        page = self.client.get("/admin")
+        self.assertEqual(page.status_code, 200)
+        text = page.get_data(as_text=True)
+        self.assertIn("Manage destinations", text)
+        self.assertIn("Chicago, IL", text)
+
+        created = self.client.post(
+            "/admin/destinations",
+            data={"csrf_token": self.headers["X-CSRF-Token"], "name": "Cyprus", "price": "239"},
+        )
+        self.assertEqual(created.status_code, 302)
+        self.assertEqual(len(self.db.destinations.documents), 3)
+        new_destination = next(destination for destination in self.db.destinations.documents.values() if destination["name"] == "Cyprus")
+
+        edited = self.client.post(
+            f"/admin/destinations/{new_destination['_id']}/edit",
+            data={"csrf_token": self.headers["X-CSRF-Token"], "price": "255"},
+        )
+        self.assertEqual(edited.status_code, 302)
+        self.assertEqual(self.db.destinations.find_one({"_id": new_destination["_id"]})["price"], 255)
+
+        deleted = self.client.post(
+            f"/admin/destinations/{new_destination['_id']}/delete",
+            data={"csrf_token": self.headers["X-CSRF-Token"]},
+        )
+        self.assertEqual(deleted.status_code, 302)
+        self.assertIsNone(self.db.destinations.find_one({"_id": new_destination["_id"]}))
+
+    def test_admin_cannot_delete_destination_in_use(self):
+        self.login(self.admin)
+        self.create()
+        response = self.client.post(
+            f"/admin/destinations/{self.chicago}/delete",
+            data={"csrf_token": self.headers["X-CSRF-Token"]},
+        )
+        self.assertEqual(response.status_code, 409)
+        self.assertIsNotNone(self.db.destinations.find_one({"_id": self.chicago}))
 
 
 if __name__ == "__main__":

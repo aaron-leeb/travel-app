@@ -36,7 +36,7 @@ Unchecked items are not validated or implemented merely by being listed.
 - [ ] Final ZIP excludes `.venv`, `.git`, credentials, and generated clutter.
 - [ ] Extract ZIP and rerun setup/demo; verify source and slides are included.
 
-Current status: seeded homepage login, user dashboard, destination management,
-and trip CRUD are implemented. Remaining gaps include logout, richer admin
-workflows, activities, final cross-role QA, and any registration flow the team
-still wants before release.
+Current status: seeded homepage login, user dashboard, admin destination
+management, logout, and trip CRUD are implemented. Remaining gaps include
+activities, final cross-role QA, and any registration flow the team still
+wants before release.

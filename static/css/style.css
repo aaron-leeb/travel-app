@@ -4,6 +4,10 @@
 :root{--sand:#ffdfc3;--cream:#fff3e7;--copper:#a76132;--brown:#653c25;--muted:#93715b}
 body{background:var(--sand);color:var(--brown)}
 .header{background:linear-gradient(180deg,#80512b55,transparent);color:#fff8ef}
+.topline-actions{align-items:center}
+.topline-actions form{margin:0}
+.topline-button{background:#fff4e540;border:1px solid #fff4e5a0;color:#fff8ef;padding:8px 14px;border-radius:999px}
+.topline-button:hover{background:#fff4e570}
 .brand,.footer-brand{font-family:'Segoe Print','Bradley Hand',Georgia,cursive;font-style:italic;font-weight:700}
 nav #nav-links{font-family:Georgia,serif;font-weight:700}
 .hero{background:linear-gradient(180deg,#e8b78d66,#824a2340),url('../images/desert.jpg') center/cover;background-color:#d39c6b}

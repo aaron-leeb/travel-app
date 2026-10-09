@@ -9,7 +9,7 @@ from bson import ObjectId
 from dotenv import load_dotenv
 from flask import Flask, current_app, redirect, render_template, request, session, url_for
 from pymongo.errors import PyMongoError
-from werkzeug.security import check_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from database import get_db, init_db
 from routes.trips import bp as trips_bp
@@ -29,11 +29,46 @@ def authenticate_user(email, password):
     return user
 
 
+def validated_signup_credentials():
+    email = request.form.get("email", "").strip().lower()
+    password = request.form.get("password", "")
+    if not email or not password:
+        return None, None, "Enter both email and password."
+    if len(email) > 320 or "@" not in email or email.startswith("@") or email.endswith("@"):
+        return None, None, "Enter a valid email address."
+    if len(password) < 8:
+        return None, None, "Password must be at least 8 characters."
+    return email, password, None
+
+
+def create_user_account(email, password):
+    existing_user = get_db().users.find_one({"email": email})
+    if existing_user is not None:
+        return None, "An account with that email already exists."
+    new_user = {
+        "email": email,
+        "name": email,
+        "password_hash": generate_password_hash(password),
+        "active": True,
+        "role": "user",
+    }
+    inserted = get_db().users.insert_one(new_user)
+    new_user["_id"] = inserted.inserted_id
+    return new_user, None
+
+
 def current_user():
     user_id = session.get("user_id")
     if not isinstance(user_id, str) or not ObjectId.is_valid(user_id):
         return None
     return get_db().users.find_one({"_id": ObjectId(user_id)})
+
+
+def store_session_user(user):
+    session["user_id"] = str(user["_id"])
+    session["user_name"] = user.get("name") or user["email"]
+    session["user_role"] = user.get("role", "user")
+    session["user_email"] = user["email"]
 
 
 def ensure_csrf_token():
@@ -53,6 +88,10 @@ def validate_csrf():
 def destination_cards():
     destinations = get_db().destinations.find({}).sort("name", 1)
     return [{"name": destination["name"], "price": destination["price"]} for destination in destinations]
+
+
+def is_admin(user):
+    return user is not None and user.get("role") == "admin"
 
 
 def user_trip_cards(user_id):
@@ -84,6 +123,20 @@ def user_trip_cards(user_id):
 def dashboard_form_destinations():
     destinations = get_db().destinations.find({}).sort("name", 1)
     return [{"_id": str(destination["_id"]), "name": destination["name"], "price": destination["price"]} for destination in destinations]
+
+
+def admin_destinations():
+    destinations = get_db().destinations.find({}).sort("name", 1)
+    result = []
+    for destination in destinations:
+        result.append(
+            {
+                "_id": str(destination["_id"]),
+                "name": destination["name"],
+                "price": destination["price"],
+            }
+        )
+    return result
 
 
 def validated_trip_form():
@@ -183,6 +236,45 @@ def validated_trip_edit_form(existing_trip):
     return trip, None
 
 
+def validated_destination_form():
+    name = request.form.get("name", "").strip()
+    if not name or len(name) > 200:
+        return None, "Destination name is required and must be 200 characters or fewer."
+    for existing in get_db().destinations.find({}):
+        if existing.get("name", "").strip().casefold() == name.casefold():
+            return None, "A destination with that name already exists."
+
+    price_text = request.form.get("price", "")
+    try:
+        price = float(price_text)
+        valid_price = math.isfinite(price) and price >= 0
+    except ValueError:
+        valid_price = False
+        price = None
+    if not valid_price:
+        return None, "Price must be a finite nonnegative number."
+    return {"name": name, "price": int(price) if price.is_integer() else price}, None
+
+
+def validated_destination_price_form():
+    price_text = request.form.get("price", "")
+    try:
+        price = float(price_text)
+        valid_price = math.isfinite(price) and price >= 0
+    except ValueError:
+        valid_price = False
+        price = None
+    if not valid_price:
+        return None, "Price must be a finite nonnegative number."
+    return int(price) if price.is_integer() else price, None
+
+
+def owned_admin_destination(destination_id):
+    if not ObjectId.is_valid(destination_id):
+        return None
+    return get_db().destinations.find_one({"_id": ObjectId(destination_id)})
+
+
 def render_dashboard(user, error=None, status=200):
     ensure_csrf_token()
     return render_template(
@@ -191,6 +283,17 @@ def render_dashboard(user, error=None, status=200):
         trips=user_trip_cards(user["_id"]),
         destinations=dashboard_form_destinations(),
         dashboard_error=error,
+        csrf_token=session["csrf_token"],
+    ), status
+
+
+def render_admin(user, error=None, status=200):
+    ensure_csrf_token()
+    return render_template(
+        "admin.html",
+        current_user={"name": user.get("name") or user["email"], "email": user["email"], "role": user.get("role", "admin")},
+        destinations=admin_destinations(),
+        admin_error=error,
         csrf_token=session["csrf_token"],
     ), status
 
@@ -215,32 +318,39 @@ def create_app(test_config=None):
         status = 200
 
         if request.method == "POST":
-            email = request.form.get("email", "").strip().lower()
-            password = request.form.get("password", "")
-            if not email or not password:
-                login_error = "Enter both email and password."
+            email, password, credential_error = validated_signup_credentials()
+            auth_action = request.form.get("auth_action", "login")
+            if credential_error is not None:
+                login_error = credential_error
                 status = 400
             else:
                 try:
-                    user = authenticate_user(email, password)
+                    if auth_action == "signup":
+                        user, signup_error = create_user_account(email, password)
+                        if signup_error is not None:
+                            login_error = signup_error
+                            status = 409
+                        else:
+                            session.clear()
+                            store_session_user(user)
+                            ensure_csrf_token()
+                            return redirect(url_for("dashboard"))
+                    else:
+                        user = authenticate_user(email, password)
+                        if user is None:
+                            login_error = "Invalid email or password."
+                            status = 401
+                        else:
+                            session.clear()
+                            store_session_user(user)
+                            ensure_csrf_token()
+                            if user.get("role") == "user":
+                                return redirect(url_for("dashboard"))
+                            return redirect(url_for("admin"))
                 except (RuntimeError, PyMongoError) as error:
                     current_app.logger.error("Login unavailable: %s", type(error).__name__)
                     login_error = "Login is unavailable until MongoDB is configured and seeded."
                     status = 503
-                else:
-                    if user is None:
-                        login_error = "Invalid email or password."
-                        status = 401
-                    else:
-                        session.clear()
-                        session["user_id"] = str(user["_id"])
-                        session["user_name"] = user.get("name") or user["email"]
-                        session["user_role"] = user.get("role", "user")
-                        session["user_email"] = user["email"]
-                        ensure_csrf_token()
-                        if user.get("role") == "user":
-                            return redirect(url_for("dashboard"))
-                        return redirect(url_for("index"))
 
         current_user = None
         destinations = []
@@ -263,10 +373,34 @@ def create_app(test_config=None):
             user = current_user()
             if user is None:
                 return redirect(url_for("index"))
+            if is_admin(user):
+                return redirect(url_for("admin"))
+            store_session_user(user)
             return render_dashboard(user)
         except (RuntimeError, PyMongoError) as error:
             current_app.logger.error("Dashboard unavailable: %s", type(error).__name__)
             return render_template("index.html", destinations=[], current_user=None, login_error="Dashboard is unavailable until MongoDB is configured and seeded."), 503
+
+    @app.get("/admin")
+    def admin():
+        try:
+            user = current_user()
+            if user is None:
+                return redirect(url_for("index"))
+            if not is_admin(user):
+                return redirect(url_for("dashboard"))
+            store_session_user(user)
+            return render_admin(user)
+        except (RuntimeError, PyMongoError) as error:
+            current_app.logger.error("Admin page unavailable: %s", type(error).__name__)
+            return render_template("index.html", destinations=[], current_user=None, login_error="Admin page is unavailable until MongoDB is configured and seeded."), 503
+
+    @app.post("/logout")
+    def logout():
+        if session.get("user_id") and validate_csrf() is not None:
+            return redirect(url_for("index"))
+        session.clear()
+        return redirect(url_for("index"))
 
     @app.post("/dashboard/trips")
     def create_dashboard_trip():
@@ -274,6 +408,8 @@ def create_app(test_config=None):
             user = current_user()
             if user is None:
                 return redirect(url_for("index"))
+            if is_admin(user):
+                return redirect(url_for("admin"))
             csrf_error = validate_csrf()
             if csrf_error is not None:
                 return render_dashboard(user, csrf_error, 403)
@@ -293,6 +429,8 @@ def create_app(test_config=None):
             user = current_user()
             if user is None:
                 return redirect(url_for("index"))
+            if is_admin(user):
+                return redirect(url_for("admin"))
             csrf_error = validate_csrf()
             if csrf_error is not None:
                 return render_dashboard(user, csrf_error, 403)
@@ -317,6 +455,8 @@ def create_app(test_config=None):
             user = current_user()
             if user is None:
                 return redirect(url_for("index"))
+            if is_admin(user):
+                return redirect(url_for("admin"))
             csrf_error = validate_csrf()
             if csrf_error is not None:
                 return render_dashboard(user, csrf_error, 403)
@@ -328,6 +468,71 @@ def create_app(test_config=None):
         except (RuntimeError, PyMongoError) as error:
             current_app.logger.error("Dashboard delete unavailable: %s", type(error).__name__)
             return render_template("index.html", destinations=[], current_user=None, login_error="Dashboard is unavailable until MongoDB is configured and seeded."), 503
+
+    @app.post("/admin/destinations")
+    def create_admin_destination():
+        try:
+            user = current_user()
+            if user is None:
+                return redirect(url_for("index"))
+            if not is_admin(user):
+                return redirect(url_for("dashboard"))
+            csrf_error = validate_csrf()
+            if csrf_error is not None:
+                return render_admin(user, csrf_error, 403)
+            destination, error = validated_destination_form()
+            if error is not None:
+                return render_admin(user, error, 400)
+            get_db().destinations.insert_one(destination)
+            return redirect(url_for("admin"))
+        except (RuntimeError, PyMongoError) as error:
+            current_app.logger.error("Admin destination create unavailable: %s", type(error).__name__)
+            return render_template("index.html", destinations=[], current_user=None, login_error="Admin page is unavailable until MongoDB is configured and seeded."), 503
+
+    @app.post("/admin/destinations/<destination_id>/edit")
+    def edit_admin_destination(destination_id):
+        try:
+            user = current_user()
+            if user is None:
+                return redirect(url_for("index"))
+            if not is_admin(user):
+                return redirect(url_for("dashboard"))
+            csrf_error = validate_csrf()
+            if csrf_error is not None:
+                return render_admin(user, csrf_error, 403)
+            destination = owned_admin_destination(destination_id)
+            if destination is None:
+                return render_admin(user, "Destination not found.", 404)
+            price, error = validated_destination_price_form()
+            if error is not None:
+                return render_admin(user, error, 400)
+            get_db().destinations.find_one_and_update({"_id": destination["_id"]}, {"$set": {"price": price}})
+            return redirect(url_for("admin"))
+        except (RuntimeError, PyMongoError) as error:
+            current_app.logger.error("Admin destination edit unavailable: %s", type(error).__name__)
+            return render_template("index.html", destinations=[], current_user=None, login_error="Admin page is unavailable until MongoDB is configured and seeded."), 503
+
+    @app.post("/admin/destinations/<destination_id>/delete")
+    def delete_admin_destination(destination_id):
+        try:
+            user = current_user()
+            if user is None:
+                return redirect(url_for("index"))
+            if not is_admin(user):
+                return redirect(url_for("dashboard"))
+            csrf_error = validate_csrf()
+            if csrf_error is not None:
+                return render_admin(user, csrf_error, 403)
+            destination = owned_admin_destination(destination_id)
+            if destination is None:
+                return render_admin(user, "Destination not found.", 404)
+            if get_db().trips.find_one({"destination_id": destination["_id"]}) is not None:
+                return render_admin(user, "Destination is still used by a trip and cannot be deleted.", 409)
+            get_db().destinations.delete_one({"_id": destination["_id"]})
+            return redirect(url_for("admin"))
+        except (RuntimeError, PyMongoError) as error:
+            current_app.logger.error("Admin destination delete unavailable: %s", type(error).__name__)
+            return render_template("index.html", destinations=[], current_user=None, login_error="Admin page is unavailable until MongoDB is configured and seeded."), 503
 
     init_db(app)
     app.register_blueprint(trips_bp)

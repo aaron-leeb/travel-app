@@ -39,9 +39,12 @@ password, the app clears the session and sets:
 - `session["user_email"]`
 
 The app then creates a session CSRF token. User accounts redirect to
-`/dashboard`; admin accounts return to `/`. The dashboard lists the signed-in
-user's trips and supports add/edit/delete actions for owned trips. Destination
-changes are intentionally blocked in the dashboard edit form.
+`/dashboard`; admin accounts redirect to `/admin`. The dashboard lists the
+signed-in user's trips and supports add/edit/delete actions for owned trips.
+Destination changes are intentionally blocked in the dashboard edit form. The
+admin page separately supports add/edit/delete destination management, with
+price-only edits and a delete guard when a destination is still referenced by a
+trip.
 
 Use `TRAVELMATE_SECRET_KEY` for signing in normal environments. If it is
 missing, the app falls back to a local-development secret so sessions still

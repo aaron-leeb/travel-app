@@ -6,8 +6,12 @@ page plus a user dashboard that uses the same signed session as the API.
 
 | Method | Path | Success |
 | --- | --- | --- |
-| POST | `/` | 302 redirect after form login; user sessions go to `/dashboard`, admin sessions return to `/` |
+| POST | `/` | 302 redirect after form login/sign-up; user sessions go to `/dashboard`, admin sessions go to `/admin` |
 | GET | `/dashboard` | 200 server-rendered user dashboard |
+| GET | `/admin` | 200 server-rendered admin destination dashboard |
+| POST | `/admin/destinations` | 302 after adding a destination |
+| POST | `/admin/destinations/<id>/edit` | 302 after updating a destination price |
+| POST | `/admin/destinations/<id>/delete` | 302 after deleting an unused destination; 409 if the destination is in use |
 | POST | `/dashboard/trips` | 302 after creating a trip from the dashboard form |
 | POST | `/dashboard/trips/<id>/edit` | 302 after updating title/dates/budget/description/status |
 | POST | `/dashboard/trips/<id>/delete` | 302 after deleting an owned trip |
@@ -50,25 +54,29 @@ details. Check session identity before querying owned resources.
 
 ## Implemented authentication and session design
 
-The homepage login form posts to `/` using the seeded `users` collection. After
-password verification, the app clears the session and stores:
+The homepage auth form posts to `/` using the seeded `users` collection for
+login and a sign-up branch for creating new normal-user accounts. After
+password verification or user creation, the app clears the session and stores:
 
 - `session["user_id"]`
 - `session["user_name"]`
 - `session["user_role"]`
 - `session["user_email"]`
 
-The server also creates a session CSRF token. User logins redirect to
-`/dashboard`; admin logins return to `/` and can use the admin-only destination
-API. There is currently no registration route, logout route, or separate admin
-dashboard.
+The server also creates a session CSRF token. Sign-up creates only
+`role="user"` accounts. User logins redirect to
+`/dashboard`; admin logins redirect to `/admin`, which provides a separate
+server-rendered destination-management page. There is currently no registration
+route.
 
 ## Authorization and administration
 
 The implemented trip endpoints are available to authenticated sessions only,
 and each operation is restricted to trips whose `user_id` matches the session
 user. `GET /api/destinations` is also authenticated. `POST /api/destinations`
-is admin-only and lets administrators add new destinations with prices.
+is admin-only and lets administrators add new destinations with prices. The
+admin dashboard also lets administrators update destination prices and delete
+destinations that are not referenced by existing trips.
 
 Potential future admin-only features include managing or deactivating user
 accounts, viewing system-wide users/trips, and administering activities. These

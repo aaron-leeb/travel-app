@@ -26,14 +26,17 @@ will have protected access to system-wide information.
 
 ## Current implementation
 
-The Flask application factory, main-page login, user dashboard, destination
-management, and trips API are implemented. The homepage signs in against the
-seeded `users` collection and shows the available destinations. User logins are
-redirected to a dashboard where they can review trips and add new ones from the
-seeded destination list. Trips now reference seeded destinations from
-`data.json` rather than accepting freeform destination text. Admin users can
-add destinations and their prices through the API. Trip CRUD APIs, a MongoDB
-adapter, validation, ownership checks, and CSRF protection are implemented.
+The Flask application factory, main-page login/sign-up, user dashboard, admin
+destination management page, and trips API are implemented. The homepage signs
+in against the seeded `users` collection, allows new normal-user accounts to be
+created from the sign-up button, and shows the available destinations. User
+logins are redirected to a dashboard where they can review trips and add new
+ones from the seeded destination list. Trips now reference seeded
+destinations from `data.json` rather than accepting freeform destination text.
+Admin users are redirected to a protected `/admin` page where they can add
+destinations, update destination prices, and delete destinations that are not
+currently referenced by trips. Trip CRUD APIs, a MongoDB adapter, validation,
+ownership checks, and CSRF protection are implemented.
 
 ## Local setup
 
@@ -77,10 +80,13 @@ The sample credentials are for local testing only:
 - `user@example.com` / `testuser`
 - `admin@example.com` / `testadmin`
 
-The homepage login uses those seeded accounts. After login:
+The homepage login uses those seeded accounts. The homepage sign-up button
+creates only normal user accounts; it does not create admin users. After login:
 
 - user sessions land on `/dashboard`, where they can review trips and add new
   trips from the available destination list
+- admin sessions land on `/admin`, where they can add destinations, edit
+  destination prices, and delete destinations that are not in use
 - `GET /api/destinations` lists available destinations
 - `POST /api/destinations` creates a destination for admin sessions
 - trip create/update requests must send `destination_id` for an existing
