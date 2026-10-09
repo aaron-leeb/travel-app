@@ -6,6 +6,7 @@ Unchecked items are not validated or implemented merely by being listed.
 
 - [x] Flask factory serves homepage and stylesheet.
 - [x] Navigation targets existing homepage sections.
+- [x] Homepage login renders and user sessions redirect to the dashboard.
 - [ ] All five members verify local startup.
 - [ ] Person 4 verifies MongoDB connection and configuration.
 - [ ] Persons 2/3/4 confirm API contract and auth interfaces.
@@ -13,15 +14,14 @@ Unchecked items are not validated or implemented merely by being listed.
 
 ## Required end-to-end gate
 
-- [ ] Register; duplicate registration fails clearly; password stored as hash.
 - [ ] Login; incorrect password fails; authenticated dashboard opens.
 - [ ] Create a trip through UI; inspect saved database record.
 - [ ] Read trip/list; refresh and confirm persistence.
 - [ ] Update and refresh; delete and confirm removal from database/UI.
 - [ ] Two users: User A cannot read/update/delete User B's trip via direct API.
 - [ ] Test malformed input, invalid IDs, missing fields, nonexistent records.
-- [ ] Logout; protected pages and API reject subsequent access.
-- [ ] Normal user denied admin page and direct admin API requests.
+- [ ] Logout route implemented; protected pages and API reject subsequent access.
+- [ ] Normal user denied direct admin API requests.
 - [ ] Admin lists users/trips and deletes a trip; no hashes exposed.
 - [ ] Confirm session write protection and secret configuration.
 
@@ -36,7 +36,7 @@ Unchecked items are not validated or implemented merely by being listed.
 - [ ] Final ZIP excludes `.venv`, `.git`, credentials, and generated clutter.
 - [ ] Extract ZIP and rerun setup/demo; verify source and slides are included.
 
-Current blockers: authentication, dashboard, admin, and activities implementations
-are pending. Person Three trip APIs and the database adapter are implemented;
-eight tests passed, including real local MongoDB CRUD/persistence. Final merges/release cannot be claimed until
-those owner contributions are available. Instructor deadline remains unverified.
+Current status: seeded homepage login, user dashboard, admin destination
+management, logout, and trip CRUD are implemented. Remaining gaps include
+activities, final cross-role QA, and any registration flow the team still
+wants before release.

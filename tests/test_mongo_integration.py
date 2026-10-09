@@ -16,14 +16,16 @@ class MongoPersistenceTest(unittest.TestCase):
         db = client[name]
         try:
             owner = ObjectId()
+            destination = ObjectId()
             db.users.insert_one({"_id": owner, "name": "API test user"})
+            db.destinations.insert_one({"_id": destination, "name": "Chicago, IL", "price": 199})
             config = {"TESTING": True, "SECRET_KEY": "test-only", "MONGO_DB": db, "MONGODB_URI": None}
             first = create_app(config).test_client()
             with first.session_transaction() as session:
                 session["user_id"] = str(owner)
             token = first.get("/api/csrf-token").json["csrf_token"]
             headers = {"X-CSRF-Token": token}
-            payload = {"title": "Persistence test", "destination": "Chicago", "start_date": "2026-11-10", "end_date": "2026-11-13", "budget": 700}
+            payload = {"title": "Persistence test", "destination_id": str(destination), "start_date": "2026-11-10", "end_date": "2026-11-13", "budget": 700}
             created = first.post("/api/trips", json=payload, headers=headers)
             self.assertEqual(created.status_code, 201)
             trip_id = created.json["trip"]["_id"]
@@ -32,6 +34,7 @@ class MongoPersistenceTest(unittest.TestCase):
                 session["user_id"] = str(owner)
             second_headers = {"X-CSRF-Token": second.get("/api/csrf-token").json["csrf_token"]}
             self.assertEqual(second.get("/api/trips/" + trip_id).json["trip"]["budget"], 700)
+            self.assertEqual(second.get("/api/trips/" + trip_id).json["trip"]["destination"]["name"], "Chicago, IL")
             self.assertEqual(len(second.get("/api/trips").json["trips"]), 1)
             payload["budget"] = 900
             self.assertEqual(second.put("/api/trips/" + trip_id, json=payload, headers=second_headers).status_code, 200)
