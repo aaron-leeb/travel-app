@@ -12,7 +12,7 @@ from pymongo.errors import PyMongoError
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from database import get_db, init_db
-from routes.trips import bp as trips_bp
+from routes.trips import admin_trips, admin_users, bp as trips_bp, trip_schedule
 
 DEFAULT_DEV_SECRET_KEY = "travelmate-local-dev-secret-key"
 
@@ -109,12 +109,14 @@ def user_trip_cards(user_id):
             {
                 "_id": str(trip["_id"]),
                 "title": trip["title"],
+                "destination_id": str(destination["_id"]),
                 "destination": destination["name"],
                 "start_date": trip["start_date"],
                 "end_date": trip["end_date"],
                 "budget": trip["budget"],
                 "description": trip.get("description", ""),
                 "status": trip["status"],
+                **trip_schedule(trip["start_date"], trip["end_date"]),
             }
         )
     return result
@@ -293,6 +295,8 @@ def render_admin(user, error=None, status=200):
         "admin.html",
         current_user={"name": user.get("name") or user["email"], "email": user["email"], "role": user.get("role", "admin")},
         destinations=admin_destinations(),
+        users=admin_users(),
+        trips=admin_trips(),
         admin_error=error,
         csrf_token=session["csrf_token"],
     ), status
@@ -532,6 +536,24 @@ def create_app(test_config=None):
             return redirect(url_for("admin"))
         except (RuntimeError, PyMongoError) as error:
             current_app.logger.error("Admin destination delete unavailable: %s", type(error).__name__)
+            return render_template("index.html", destinations=[], current_user=None, login_error="Admin page is unavailable until MongoDB is configured and seeded."), 503
+
+    @app.post("/admin/trips/<trip_id>/delete")
+    def delete_admin_trip(trip_id):
+        try:
+            user = current_user()
+            if user is None:
+                return redirect(url_for("index"))
+            if not is_admin(user):
+                return redirect(url_for("dashboard"))
+            csrf_error = validate_csrf()
+            if csrf_error is not None:
+                return render_admin(user, csrf_error, 403)
+            if not ObjectId.is_valid(trip_id) or get_db().trips.delete_one({"_id": ObjectId(trip_id)}).deleted_count == 0:
+                return render_admin(user, "Trip not found.", 404)
+            return redirect(url_for("admin"))
+        except (RuntimeError, PyMongoError) as error:
+            current_app.logger.error("Admin trip delete unavailable: %s", type(error).__name__)
             return render_template("index.html", destinations=[], current_user=None, login_error="Admin page is unavailable until MongoDB is configured and seeded."), 503
 
     init_db(app)

@@ -1,17 +1,18 @@
 # Replace your photos
 
-Photos are in `travel-app/static/images/`.
+The homepage slideshow shows these files from `static/images/`, in order:
 
-Home slideshow, in order:
-1. `hero-island.jpg`: earlier island photo
+1. `hero-caribbean.jpg`: Caribbean beach photo
 2. `hero-sahara.jpg`: Sahara photo
-3. `hero-caribbean.jpg`: Caribbean beach photo
-4. `hero-kenya.jpg`: Kenya safari photo. This currently copies the desert image as a placeholder. Replace it with your own Kenya photo.
+3. `hero-kenya.jpg`: Kenya safari photo
 
-Replace these files with JPG photos using exactly the same filenames. Wide photos around 1920 x 1080 work best. Refresh the browser after saving; use a hard refresh if the old photo remains.
+To swap a photo, replace the file using exactly the same filename. Wide photos
+around 1920 x 1080 work best; small images look blurry when stretched across
+the hero. Hard-refresh the browser (Ctrl+F5) if the old photo remains.
 
-To change captions, add slides, or use PNG/WebP images, edit `heroSlides` near the bottom of `static/js/app.js`. Set `heroIntervalMs` to change the five-second interval.
+To add, remove, or reorder slides, edit the `slideImages` list in
+`static/js/app.js`. Slides change every five seconds (the `5000` in the same
+file). Autoplay is off for visitors who prefer reduced motion.
 
-Destination cards use the image names in `app.py`. Their files are also in `static/images/`. The cold cards currently share `alpine.svg`.
-
-The slideshow pauses while hovered, while its controls or search fields have keyboard focus, and when the browser tab is hidden. It has arrows, dots, a pause/play button, and touch swipe. Reduced-motion preferences disable autoplay initially.
+The other images in `static/images/` and the copies directly in `static/` are
+not used by any page.

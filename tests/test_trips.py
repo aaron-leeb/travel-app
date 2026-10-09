@@ -360,6 +360,7 @@ class TripAPITests(unittest.TestCase):
         redirect = self.client.get("/dashboard")
         self.assertEqual(redirect.status_code, 302)
         self.assertTrue(redirect.headers["Location"].endswith("/"))
+        self.assertEqual(self.client.get("/api/trips").status_code, 401)
 
     def test_admin_page_requires_admin_and_manages_destinations(self):
         response = self.client.get("/admin")
@@ -372,6 +373,9 @@ class TripAPITests(unittest.TestCase):
         text = page.get_data(as_text=True)
         self.assertIn("Manage destinations", text)
         self.assertIn("Chicago, IL", text)
+        add_form = text.split('action="/admin/destinations"', 1)[1].split("</form>", 1)[0]
+        self.assertIn('<input name="name"', add_form)
+        self.assertIn('<input name="price"', add_form)
 
         created = self.client.post(
             "/admin/destinations",
@@ -394,6 +398,56 @@ class TripAPITests(unittest.TestCase):
         )
         self.assertEqual(deleted.status_code, 302)
         self.assertIsNone(self.db.destinations.find_one({"_id": new_destination["_id"]}))
+
+    def test_admin_api_lists_users_and_all_trips_and_deletes_any_trip(self):
+        trip_id = self.create()
+        for method, path in [
+            ("GET", "/api/admin/users"),
+            ("GET", "/api/admin/trips"),
+            ("DELETE", "/api/admin/trips/" + trip_id),
+        ]:
+            with self.subTest(method=method, path=path):
+                self.assertEqual(self.client.open(path, method=method, headers=self.headers).status_code, 403)
+
+        self.login(self.admin)
+        users = self.client.get("/api/admin/users").json["users"]
+        self.assertEqual(
+            users,
+            [
+                {"_id": str(self.admin), "name": "Test Admin", "email": "admin@example.com", "role": "admin", "active": True},
+                {"_id": str(self.owner), "name": "Test User", "email": "user@example.com", "role": "user", "active": True},
+            ],
+        )
+
+        trips = self.client.get("/api/admin/trips").json["trips"]
+        self.assertEqual(len(trips), 1)
+        self.assertEqual(trips[0]["_id"], trip_id)
+        self.assertEqual(trips[0]["owner_email"], "user@example.com")
+        self.assertEqual(trips[0]["destination_name"], "Chicago, IL")
+
+        self.assertEqual(self.client.delete("/api/admin/trips/bad-id", headers=self.headers).status_code, 400)
+        self.assertEqual(self.client.delete("/api/admin/trips/" + trip_id, headers=self.headers).json, {"deleted": True})
+        self.assertIsNone(self.db.trips.find_one({"_id": ObjectId(trip_id)}))
+        self.assertEqual(self.client.delete("/api/admin/trips/" + trip_id, headers=self.headers).status_code, 404)
+
+    def test_admin_page_shows_users_and_trips_and_deletes_trip(self):
+        trip_id = self.create()
+        denied = self.client.post(f"/admin/trips/{trip_id}/delete", data={"csrf_token": self.headers["X-CSRF-Token"]})
+        self.assertTrue(denied.headers["Location"].endswith("/dashboard"))
+        self.assertIsNotNone(self.db.trips.find_one({"_id": ObjectId(trip_id)}))
+
+        self.login(self.admin)
+        page = self.client.get("/admin").get_data(as_text=True)
+        self.assertIn('<h2>Users</h2><span class="count">2</span>', page)
+        self.assertIn("user@example.com", page)
+        self.assertIn('<h2>All trips</h2><span class="count">1</span>', page)
+        self.assertIn("Chicago Weekend", page)
+        self.assertNotIn("scrypt", page)
+
+        deleted = self.client.post(f"/admin/trips/{trip_id}/delete", data={"csrf_token": self.headers["X-CSRF-Token"]})
+        self.assertEqual(deleted.status_code, 302)
+        self.assertIsNone(self.db.trips.find_one({"_id": ObjectId(trip_id)}))
+        self.assertIn('<h2>All trips</h2><span class="count">0</span>', self.client.get("/admin").get_data(as_text=True))
 
     def test_admin_cannot_delete_destination_in_use(self):
         self.login(self.admin)

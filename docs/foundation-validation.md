@@ -1,5 +1,9 @@
 # Person 1 foundation validation
 
+Historical record of the first foundation check. Logout, sign-up, and the
+dashboards have since been implemented; see the
+[integration checklist](integration-checklist.md) for current status.
+
 Current-instance checks completed using Python 3.12.14 and Flask 3.1.2:
 
 - Installed `requirements.txt` dependencies in `.venv`; `pip check` passed.

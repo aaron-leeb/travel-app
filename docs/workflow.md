@@ -3,10 +3,10 @@
 Use the existing checkout. Cloud tasks are already isolated; do not create a
 worktree unless explicitly requested. Never overwrite teammates' local changes.
 
-Work on feature branches: `feature/frontend`, `feature/api`, `feature/auth`,
-`feature/activities`, `feature/admin`. Person 1 reviews and integrates changes.
-The cloud checkout currently uses `work`; no branch rename or remote push is
-required just to develop. Confirm shared branch policy before publishing work.
+Work on feature branches (for example `feature/frontend`, `feature/api`,
+`feature/auth`, `feature/admin`) and merge to `main` through GitHub pull
+requests. Person 1 reviews and integrates changes. Confirm shared branch policy
+before publishing work.
 
 1. Update from the shared branch before beginning, preserving local work.
 2. Keep commits focused; inspect the diff and exclude secrets/generated files.

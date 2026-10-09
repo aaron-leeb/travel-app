@@ -14,8 +14,8 @@ const heroSlides = homeHero ? homeHero.querySelector(".hero-slides") : null;
 
 if (homeHero && heroSlides) {
   const slideImages = [
-    "/static/images/hero-island.jpg",
     "/static/images/hero-caribbean.jpg",
+    "/static/images/hero-sahara.jpg",
     "/static/images/hero-kenya.jpg"
   ];
 
