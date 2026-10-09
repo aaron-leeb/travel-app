@@ -41,6 +41,14 @@ def validated_signup_credentials():
     return email, password, None
 
 
+def login_credentials():
+    email = request.form.get("email", "").strip().lower()
+    password = request.form.get("password", "")
+    if not email or not password:
+        return None, None, "Enter both email and password."
+    return email, password, None
+
+
 def create_user_account(email, password):
     existing_user = get_db().users.find_one({"email": email})
     if existing_user is not None:
@@ -318,8 +326,11 @@ def create_app(test_config=None):
         status = 200
 
         if request.method == "POST":
-            email, password, credential_error = validated_signup_credentials()
             auth_action = request.form.get("auth_action", "login")
+            if auth_action == "signup":
+                email, password, credential_error = validated_signup_credentials()
+            else:
+                email, password, credential_error = login_credentials()
             if credential_error is not None:
                 login_error = credential_error
                 status = 400
@@ -381,12 +392,25 @@ def create_app(test_config=None):
             current_app.logger.error("Dashboard unavailable: %s", type(error).__name__)
             return render_template("index.html", destinations=[], current_user=None, login_error="Dashboard is unavailable until MongoDB is configured and seeded."), 503
 
+    @app.get("/user")
+    def user_redirect():
+        try:
+            user = current_user()
+            if user is None:
+                return redirect(url_for("index"))
+            if is_admin(user):
+                return redirect(url_for("admin"))
+            return redirect(url_for("dashboard"))
+        except (RuntimeError, PyMongoError) as error:
+            current_app.logger.error("User redirect unavailable: %s", type(error).__name__)
+            return redirect(url_for("index"))
+
     @app.get("/admin")
     def admin():
         try:
             user = current_user()
             if user is None:
-                return redirect(url_for("index"))
+                return "", 404
             if not is_admin(user):
                 return redirect(url_for("dashboard"))
             store_session_user(user)

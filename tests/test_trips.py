@@ -280,6 +280,16 @@ class TripAPITests(unittest.TestCase):
         self.assertEqual(response.status_code, 409)
         self.assertIn("already exists", response.get_data(as_text=True))
 
+    def test_homepage_login_short_wrong_password_reports_invalid_credentials(self):
+        response = self.client.post(
+            "/",
+            data={"email": "user@example.com", "password": "short", "auth_action": "login"},
+        )
+        self.assertEqual(response.status_code, 401)
+        page = response.get_data(as_text=True)
+        self.assertIn("Invalid email or password.", page)
+        self.assertNotIn("Password must be at least 8 characters.", page)
+
     def test_dashboard_shows_destinations_and_adds_trip(self):
         response = self.client.get("/dashboard")
         self.assertEqual(response.status_code, 200)
@@ -349,6 +359,23 @@ class TripAPITests(unittest.TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertTrue(response.headers["Location"].endswith("/"))
 
+    def test_user_route_redirects_by_session(self):
+        with self.client.session_transaction() as session:
+            session.clear()
+        response = self.client.get("/user")
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.headers["Location"].endswith("/"))
+
+        self.login(self.owner)
+        response = self.client.get("/user")
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.headers["Location"].endswith("/dashboard"))
+
+        self.login(self.admin)
+        response = self.client.get("/user")
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.headers["Location"].endswith("/admin"))
+
     def test_logout_clears_session_from_dashboard(self):
         page = self.client.get("/dashboard").get_data(as_text=True)
         self.assertIn("Log out", page)
@@ -362,6 +389,12 @@ class TripAPITests(unittest.TestCase):
         self.assertTrue(redirect.headers["Location"].endswith("/"))
 
     def test_admin_page_requires_admin_and_manages_destinations(self):
+        with self.client.session_transaction() as session:
+            session.clear()
+        response = self.client.get("/admin")
+        self.assertEqual(response.status_code, 404)
+
+        self.login(self.owner)
         response = self.client.get("/admin")
         self.assertEqual(response.status_code, 302)
         self.assertTrue(response.headers["Location"].endswith("/dashboard"))
