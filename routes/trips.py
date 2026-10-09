@@ -191,6 +191,58 @@ def require_trip(trip):
     return trip
 
 
+def trip_schedule(start_date, end_date):
+    start, end = date.fromisoformat(start_date), date.fromisoformat(end_date)
+    nights = (end - start).days
+    start_text = f"{start:%b} {start.day}"
+    end_text = f"{end:%b} {end.day}, {end.year}"
+    return {
+        "start_month": f"{start:%b}",
+        "start_day": start.day,
+        "date_range": f"{start_text} – {end_text}",
+        "nights": "Day trip" if nights == 0 else f"{nights} night{'' if nights == 1 else 's'}",
+    }
+
+
+def admin_users():
+    return [
+        {
+            "_id": str(user["_id"]),
+            "name": user.get("name") or user["email"],
+            "email": user["email"],
+            "role": user.get("role", "user"),
+            "active": bool(user.get("active")),
+        }
+        for user in get_db().users.find({}).sort("email", 1)
+    ]
+
+
+def admin_trips():
+    owners = {user["_id"]: user for user in get_db().users.find({})}
+    destinations = {destination["_id"]: destination for destination in get_db().destinations.find({})}
+    result = []
+    for trip in get_db().trips.find({}).sort("_id", -1):
+        owner = owners.get(trip["user_id"])
+        destination = destinations.get(trip["destination_id"])
+        result.append(
+            {
+                "_id": str(trip["_id"]),
+                "user_id": str(trip["user_id"]),
+                "owner_email": owner["email"] if owner else None,
+                "destination_id": str(trip["destination_id"]),
+                "destination_name": destination["name"] if destination else None,
+                "title": trip["title"],
+                "start_date": trip["start_date"],
+                "end_date": trip["end_date"],
+                "budget": trip["budget"],
+                "description": trip.get("description", ""),
+                "status": trip["status"],
+                **trip_schedule(trip["start_date"], trip["end_date"]),
+            }
+        )
+    return result
+
+
 @bp.get("/csrf-token")
 @authenticated
 def csrf_token():
@@ -255,6 +307,32 @@ def update_trip(trip_id):
 @authenticated
 def delete_trip(trip_id):
     result = get_db().trips.delete_one(owned_filter(trip_id))
+    if result.deleted_count == 0:
+        raise APIError(404, "not_found", "Trip not found.")
+    return jsonify(deleted=True)
+
+
+@bp.get("/admin/users")
+@authenticated
+@require_admin
+def list_admin_users():
+    return jsonify(users=admin_users())
+
+
+@bp.get("/admin/trips")
+@authenticated
+@require_admin
+def list_admin_trips():
+    return jsonify(trips=admin_trips())
+
+
+@bp.delete("/admin/trips/<trip_id>")
+@authenticated
+@require_admin
+def delete_admin_trip(trip_id):
+    if not ObjectId.is_valid(trip_id):
+        raise APIError(400, "invalid_id", "Trip ID must be a valid ObjectId.")
+    result = get_db().trips.delete_one({"_id": ObjectId(trip_id)})
     if result.deleted_count == 0:
         raise APIError(404, "not_found", "Trip not found.")
     return jsonify(deleted=True)

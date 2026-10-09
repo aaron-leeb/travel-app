@@ -1,19 +1,45 @@
 # TravelMate frontend
 
-Run from this folder:
+See the [README](README.md) for setup. Once the app is running, open
+http://127.0.0.1:5000.
 
-```sh
-python -m pip install -r requirements.txt
-python -m flask --app app:create_app run --debug
-```
+## Files
 
-Open http://127.0.0.1:5000. The main page provides demo login/sign-up and shows the available destinations.
+- `templates/base.html`: shared layout, header (hidden on `/admin`), footer, font and script loading.
+- `templates/index.html`: homepage hero slideshow, login/sign-up form, available destinations.
+- `templates/dashboard.html`: user planner (trip cards plus the "Plan a trip" form).
+- `templates/admin.html`: admin destination management, user list, and all-trips list.
+- `static/css/style.css`: all styling.
+- `static/js/app.js`: mobile menu toggle and the homepage slideshow.
+- `static/js/trips.js`: dashboard create/edit/delete through `fetch()` and the JSON API.
+- `static/images/`: slideshow photos (see [PHOTO_GUIDE.md](PHOTO_GUIDE.md)).
 
-Frontend files are in templates/, static/css/style.css, static/js/app.js, and static/images/. The small additions to app.py register the login page, user dashboard, and API integration points.
+## Design
 
-The layout follows the provided reference with a coastal hero, teal search tabs, destination cards, a scenic banner, features, gallery, newsletter, and footer. Photos were extracted from the supplied reference and can be replaced with higher-resolution licensed originals using the same filenames.
+- Theme: peach and sand backgrounds, copper buttons, warm brown text. Colours
+  are CSS variables at the top of `style.css` (`--ink`, `--copper`, `--paper`, ...).
+- Font: [Jost](https://fonts.google.com/specimen/Jost) from Google Fonts, with
+  light weights for large headings and small spaced uppercase for labels. The
+  `--font` variable has system fallbacks if Google Fonts is unreachable.
+- Dashboard: trips are itinerary cards with a date block (month/day), destination,
+  date range, nights, budget, status pill, and notes. "Edit trip" expands an
+  inline form. On wide screens the "Plan a trip" card sits on the right and
+  stays in view while scrolling; under 900px it stacks above the trip list.
+- Admin: an add-destination bar styled like the homepage login bar, destination
+  cards two per row with inline price editing, and row lists for users and trips.
 
-The homepage explains the seeded demo login and current destination list. New accounts can be created from the same homepage with the Sign up button and are always normal user accounts. User logins are redirected to a dashboard for viewing trips and creating new ones from the available destinations. Admin logins are redirected to a separate admin page for adding destinations, updating destination prices, and deleting unused destinations.
+## Dashboard JavaScript
 
-## Sahara theme update
-The existing page layout is preserved. Peach and sand backgrounds, copper buttons, warm brown text, bold white hero headings, and a desert photo treatment follow the new reference. Destination photos stay in the destination cards. The desert asset is a low-resolution text-free crop from the supplied screenshot; replace static/images/desert.jpg with a high-resolution desert photo for sharper results.
+`trips.js` intercepts the dashboard forms and calls the API instead:
+
+| Action | Request |
+| --- | --- |
+| Plan a trip | `POST /api/trips` |
+| Save changes | `PUT /api/trips/<id>` |
+| Delete | `DELETE /api/trips/<id>` |
+
+Each call sends JSON with the page's CSRF token in the `X-CSRF-Token` header,
+then reloads the list with `GET /api/trips` and shows a status message (or the
+API's error message). The card markup in `tripCard()` must stay in sync with
+the trip card in `dashboard.html`. Without JavaScript the same forms post to
+the `/dashboard/trips...` routes and the page reloads.

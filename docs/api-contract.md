@@ -1,20 +1,33 @@
-# Trip API contract
+# API and route contract
 
-The trip blueprint implements this contract. Local MongoDB CRUD/persistence
-verification passed, and the current app now includes a server-rendered login
-page plus a user dashboard that uses the same signed session as the API.
+Everything below is implemented and covered by the test suite. Page routes
+return HTML; `/api` routes return JSON.
+
+## Page and form routes (`app.py`)
 
 | Method | Path | Success |
 | --- | --- | --- |
-| POST | `/` | 302 redirect after form login/sign-up; user sessions go to `/dashboard`, admin sessions go to `/admin` |
-| GET | `/dashboard` | 200 server-rendered user dashboard |
-| GET | `/admin` | 200 server-rendered admin destination dashboard |
-| POST | `/admin/destinations` | 302 after adding a destination |
-| POST | `/admin/destinations/<id>/edit` | 302 after updating a destination price |
-| POST | `/admin/destinations/<id>/delete` | 302 after deleting an unused destination; 409 if the destination is in use |
-| POST | `/dashboard/trips` | 302 after creating a trip from the dashboard form |
+| GET | `/` | 200 homepage with login/sign-up and destinations |
+| POST | `/` | 302 after login or sign-up; users go to `/dashboard`, admins to `/admin`. Failures re-render with 400 (bad input), 401 (wrong password), 409 (email taken), or 503 (no database) |
+| POST | `/logout` | 302 to `/` after clearing the session |
+| GET | `/dashboard` | 200 user dashboard (admins are redirected to `/admin`) |
+| POST | `/dashboard/trips` | 302 after creating a trip |
 | POST | `/dashboard/trips/<id>/edit` | 302 after updating title/dates/budget/description/status |
 | POST | `/dashboard/trips/<id>/delete` | 302 after deleting an owned trip |
+| GET | `/admin` | 200 admin dashboard (non-admins are redirected to `/dashboard`) |
+| POST | `/admin/destinations` | 302 after adding a destination |
+| POST | `/admin/destinations/<id>/edit` | 302 after updating a destination price |
+| POST | `/admin/destinations/<id>/delete` | 302 after deleting an unused destination; 409 if a trip uses it |
+| POST | `/admin/trips/<id>/delete` | 302 after deleting any user's trip |
+
+Form routes redirect to `/` without a session, return 403 for a bad CSRF
+token, 400 for invalid input, 404 for missing or unowned records, and 503 when
+MongoDB is unavailable.
+
+## JSON API (`routes/trips.py`)
+
+| Method | Path | Success |
+| --- | --- | --- |
 | GET | `/api/csrf-token` | 200, `{"csrf_token":"..."}` |
 | GET | `/api/destinations` | 200, `{"destinations": [...]}` |
 | POST | `/api/destinations` | 201, `{"destination": {...}}` (admin only) |
@@ -23,6 +36,9 @@ page plus a user dashboard that uses the same signed session as the API.
 | GET | `/api/trips/<id>` | 200, `{"trip": {...}}` |
 | PUT | `/api/trips/<id>` | 200, `{"trip": {...}}` |
 | DELETE | `/api/trips/<id>` | 200, `{"deleted": true}` |
+| GET | `/api/admin/users` | 200, `{"users": [...]}` with `_id`, `name`, `email`, `role`, `active` (admin only, no password hashes) |
+| GET | `/api/admin/trips` | 200, `{"trips": [...]}` for every user, with `owner_email` and `destination_name` (admin only) |
+| DELETE | `/api/admin/trips/<id>` | 200, `{"deleted": true}` for any user's trip (admin only) |
 
 Create and PUT requests use `Content-Type: application/json` and fields:
 
@@ -38,69 +54,53 @@ Create and PUT requests use `Content-Type: application/json` and fields:
 }
 ```
 
-Implemented rules: title is trimmed nonempty text; destination_id must be a valid
-ObjectId string for an existing destination; dates are valid YYYY-MM-DD with
-end >= start; budget is a finite nonnegative number (not boolean); description
-is optional; status defaults to Planned and allows Planned, Ongoing, Completed.
-PUT supplies the full editable record. IDs are JSON strings in `_id`,
-`user_id`, and `destination_id`, never raw ObjectIds. Do not accept client
-ownership changes.
+Validation rules: title is trimmed nonempty text (max 200); destination_id must
+be a valid ObjectId string for an existing destination; dates are valid
+YYYY-MM-DD with end >= start; budget is a finite nonnegative number (not a
+boolean); description is optional (max 5000); status defaults to Planned and
+allows Planned, Ongoing, Completed. Unknown fields, including `_id` and
+`user_id`, are rejected. PUT supplies the full editable record. IDs are JSON
+strings in `_id`, `user_id`, and `destination_id`, never raw ObjectIds.
 
-Errors use `{"error": {"code": "invalid_input", "message": "..."}}`.
-Use 400 for malformed JSON, invalid IDs, or validation; 401 without a session;
-404 for nonexistent or other-user trips (avoid leaking their existence); 415
-for a non-JSON write request; 500 for unexpected failures without internal
-details. Check session identity before querying owned resources.
+Errors use `{"error": {"code": "invalid_input", "message": "..."}}`:
 
-## Implemented authentication and session design
+| Status | When |
+| --- | --- |
+| 400 | Malformed JSON, invalid ID, or failed validation |
+| 401 | No session, or the session's account no longer exists |
+| 403 | Missing/invalid CSRF token, or a non-admin calling an admin route |
+| 404 | Trip does not exist or belongs to another user (same response, to avoid leaking existence) |
+| 409 | Destination name already exists |
+| 415 | Write request without a JSON content type |
+| 503 | MongoDB not configured or unreachable |
+| 500 | Unexpected failure; internal details are never returned |
 
-The homepage auth form posts to `/` using the seeded `users` collection for
-login and a sign-up branch for creating new normal-user accounts. After
-password verification or user creation, the app clears the session and stores:
+## Authentication and sessions
+
+The homepage form posts to `/` with `auth_action` set to `login` or `signup`.
+Login verifies the Werkzeug password hash of an active account; sign-up creates
+a new `role="user"` account (never an admin). Either way the app clears the
+session and stores:
 
 - `session["user_id"]`
 - `session["user_name"]`
 - `session["user_role"]`
 - `session["user_email"]`
 
-The server also creates a session CSRF token. Sign-up creates only
-`role="user"` accounts. User logins redirect to
-`/dashboard`; admin logins redirect to `/admin`, which provides a separate
-server-rendered destination-management page. There is currently no registration
-route.
+It also creates a session CSRF token. HTML forms send it as a hidden
+`csrf_token` field; API writes (POST, PUT, DELETE) send it in `X-CSRF-Token`.
+The dashboard's `trips.js` reads it from the page; other clients can call
+`GET /api/csrf-token`. Logout requires the token and clears the whole session.
 
-## Authorization and administration
+## Authorization
 
-The implemented trip endpoints are available to authenticated sessions only,
-and each operation is restricted to trips whose `user_id` matches the session
-user. `GET /api/destinations` is also authenticated. `POST /api/destinations`
-is admin-only and lets administrators add new destinations with prices. The
-admin dashboard also lets administrators update destination prices and delete
-destinations that are not referenced by existing trips.
-
-Potential future admin-only features include managing or deactivating user
-accounts, viewing system-wide users/trips, and administering activities. These
-should use separate admin routes protected by a server-side role check. Do not
-widen the existing user trip routes to bypass owner checks.
-
-## Security/integration decisions
-
-- API reads/writes depend on a signed Flask session and server-side ownership
-  checks.
-- JSON API writes require `X-CSRF-Token` from `GET /api/csrf-token`.
-- Dashboard form writes use the same session CSRF token through hidden form
-  fields.
-- Agree whether deleting a trip deletes its activities, with Person 5.
-- Admin routes are separate and require backend role checks.
-- Never return password hashes in user/admin JSON responses.
-- Session expiry/rotation/logout policy still needs to be defined if the team
-  expands authentication beyond the current demo login.
-
-## Implemented integration interface
-
-See [Person Three notes](person-3-api-notes.md). Authenticated writes require
-X-CSRF-Token from GET /api/csrf-token; missing/invalid tokens return 403.
-Database configuration/availability errors return 503. The homepage login sets
-the session fields after verified login.
-The user account is rechecked in MongoDB before each trip request.
-DELETE currently removes only the trip; activity cleanup remains a team decision.
+- User trip routes only ever query trips whose `user_id` matches the session
+  user, so User A cannot read, edit, or delete User B's trip by ID.
+- Admin pages and `/api/admin/*` and `POST /api/destinations` check the stored
+  role server-side (`require_admin` / `is_admin`). Non-admins get 403 from the
+  API and are redirected away from `/admin`.
+- Admin routes are separate from user routes; user routes are never widened to
+  bypass owner checks.
+- Password hashes are never returned in any response.
+- Deleting a trip removes only that trip. Deleting a destination is refused
+  while any trip references it.
